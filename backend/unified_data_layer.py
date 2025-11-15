@@ -149,6 +149,8 @@ class UnifiedDataProvider:
             'flare': 'flare-networks', 'flr': 'flare-networks',
             'cardano': 'cardano', 'ada': 'cardano',
             'ripple': 'ripple', 'xrp': 'ripple',
+            'firo': 'zcoin', 'firo coin': 'zcoin',
+            'worldcoin': 'worldcoin-wld', 'wld': 'worldcoin-wld',
         }
         
         message_lower = message.lower()
