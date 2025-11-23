@@ -1,7 +1,7 @@
 """
 Main FastAPI application - точка входа backend
 """
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -9,6 +9,7 @@ from typing import List, Optional, Dict
 import os
 from dotenv import load_dotenv
 import json
+import base64
 
 from data_layer import CryptoDataProvider
 from stock_data_layer import StockDataProvider
@@ -47,6 +48,8 @@ class ChatMessage(BaseModel):
     message: str
     session_id: Optional[str] = "default"
     include_market_data: bool = True
+    image_base64: Optional[str] = None  # base64 encoded image
+    image_mime_type: Optional[str] = "image/jpeg"  # MIME type of image
 
 
 class ChatResponse(BaseModel):
@@ -250,17 +253,26 @@ async def chat(request: ChatMessage):
             market_data['trending'] = data_provider.get_trending_coins()
             market_data['top_coins'] = data_provider.get_top_coins(limit=10)
         
-        # Получаем ответ от AI
+        # Получаем ответ от AI (с поддержкой изображений)
         response_text = await ai_assistant.get_response(
             user_message=request.message,
             market_data=market_data,
-            conversation_history=conversation_sessions[session_id]
+            conversation_history=conversation_sessions[session_id],
+            image_base64=request.image_base64,
+            image_mime_type=request.image_mime_type
         )
         
         # Сохраняем в историю
+        user_content = request.message if request.message.strip() else ""
+        if request.image_base64:
+            if user_content:
+                user_content = f"{user_content}\n[Изображение прикреплено]"
+            else:
+                user_content = "[Изображение прикреплено]"
+        
         conversation_sessions[session_id].append({
             "role": "user",
-            "content": request.message
+            "content": user_content
         })
         conversation_sessions[session_id].append({
             "role": "assistant",
@@ -307,9 +319,16 @@ async def chat_stream(request: ChatMessage):
             market_data['top_coins'] = data_provider.get_top_coins(limit=10)
         
         # Сохраняем вопрос пользователя
+        user_content = request.message if request.message.strip() else ""
+        if request.image_base64:
+            if user_content:
+                user_content = f"{user_content}\n[Изображение прикреплено]"
+            else:
+                user_content = "[Изображение прикреплено]"
+        
         conversation_sessions[session_id].append({
             "role": "user",
-            "content": request.message
+            "content": user_content
         })
         
         async def generate():
@@ -317,7 +336,9 @@ async def chat_stream(request: ChatMessage):
             async for chunk in ai_assistant.get_streaming_response(
                 user_message=request.message,
                 market_data=market_data,
-                conversation_history=conversation_sessions[session_id][:-1]
+                conversation_history=conversation_sessions[session_id][:-1],
+                image_base64=request.image_base64,
+                image_mime_type=request.image_mime_type
             ):
                 full_response += chunk
                 yield f"data: {json.dumps({'chunk': chunk})}\n\n"

@@ -172,7 +172,9 @@ class AIAssistant:
         self, 
         user_message: str, 
         market_data: Dict,
-        conversation_history: Optional[List[Dict]] = None
+        conversation_history: Optional[List[Dict]] = None,
+        image_base64: Optional[str] = None,
+        image_mime_type: Optional[str] = "image/jpeg"
     ) -> str:
         """Получить ответ от AI модели"""
         try:
@@ -188,35 +190,113 @@ class AIAssistant:
             if conversation_history:
                 messages.extend(conversation_history[-10:])  # последние 10 сообщений
             
-            # Добавляем контекст с данными
-            context_message = f"""Актуальные данные о рынке (JSON):
+            # Если есть изображение, используем специальный промпт для изображений
+            if image_base64:
+                image_prompt = """ТВОИ ПРАВИЛА РАБОТЫ С ИЗОБРАЖЕНИЯМИ:
+
+Если пользователь прикрепил изображение:
+
+1. Определи, что на нём
+2. Опиши видимую информацию
+3. Выдели ключевые элементы
+4. Сделай короткий вывод
+
+Не придумывай того, чего не видно.
+Если изображение нечеткое — запроси лучшее.
+
+Если на изображении график:
+- опиши тренд (вверх/вниз/флэт)
+- уровни поддержки/сопротивления
+- волатильность
+- объемы (если видно)
+- вероятное направление движения (без процентов и рекомендаций)
+
+НЕ использовать:
+- реальные названия активов, если их не видно
+- финансовые советы
+- прогнозы прибыли
+
+Если изображения нет — работай как обычный текстовый ассистент."""
+                
+                # Формируем сообщение с изображением
+                user_content = []
+                
+                # Формируем текстовую часть (всегда добавляем, даже если нет текста от пользователя)
+                text_prompt = f"""{image_prompt}
+
+Проанализируй прикрепленное изображение согласно правилам выше."""
+                
+                if user_message.strip():
+                    text_prompt = f"""Актуальные данные о рынке (JSON):
+
+{market_context}
+
+Вопрос пользователя: "{user_message}"
+
+{image_prompt}
+
+Проанализируй прикрепленное изображение согласно правилам выше."""
+                
+                user_content.append({
+                    "type": "text",
+                    "text": text_prompt
+                })
+                
+                # Добавляем изображение
+                user_content.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{image_mime_type};base64,{image_base64}"
+                    }
+                })
+                
+                messages.append({
+                    "role": "user",
+                    "content": user_content
+                })
+                
+                # Используем vision модель для OpenAI
+                if self.provider == "openai":
+                    response = self.client.chat.completions.create(
+                        model="gpt-4o-mini",  # Используем модель с поддержкой vision
+                        messages=messages,
+                        temperature=0.7,
+                        max_tokens=1500
+                    )
+                    return response.choices[0].message.content
+                elif self.provider == "groq":
+                    # Groq пока не поддерживает vision, возвращаем сообщение
+                    return "Извините, обработка изображений пока доступна только с OpenAI. Пожалуйста, используйте OpenAI провайдер."
+            else:
+                # Обычный текстовый запрос
+                context_message = f"""Актуальные данные о рынке (JSON):
 
 {market_context}
 
 Вопрос пользователя: "{user_message}"
 
 Используй только данные из JSON. Дай аналитический, конкретный ответ, включая актуальные цены всех запрашиваемых монет и динамику их изменения. Не используй шаблонные блоки, формируй ответ под суть вопроса."""
-            
-            messages.append({"role": "user", "content": context_message})
-            
-            # Вызываем модель
-            if self.provider == "openai":
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    temperature=0.7,
-                    max_tokens=1500
-                )
-                return response.choices[0].message.content
-            
-            elif self.provider == "groq":
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    temperature=0.7,
-                    max_tokens=1500
-                )
-                return response.choices[0].message.content
+                
+                messages.append({"role": "user", "content": context_message})
+                
+                # Вызываем модель
+                if self.provider == "openai":
+                    response = self.client.chat.completions.create(
+                        model=self.model,
+                        messages=messages,
+                        temperature=0.7,
+                        max_tokens=1500
+                    )
+                    return response.choices[0].message.content
+                
+                elif self.provider == "groq":
+                    response = self.client.chat.completions.create(
+                        model=self.model,
+                        messages=messages,
+                        temperature=0.7,
+                        max_tokens=1500
+                    )
+                    return response.choices[0].message.content
             
         except Exception as e:
             print(f"Error getting AI response: {e}")
@@ -226,7 +306,9 @@ class AIAssistant:
         self,
         user_message: str,
         market_data: Dict,
-        conversation_history: Optional[List[Dict]] = None
+        conversation_history: Optional[List[Dict]] = None,
+        image_base64: Optional[str] = None,
+        image_mime_type: Optional[str] = "image/jpeg"
     ):
         """Получить стриминговый ответ от AI модели"""
         try:
@@ -239,41 +321,120 @@ class AIAssistant:
             if conversation_history:
                 messages.extend(conversation_history[-10:])
             
-            context_message = f"""Актуальные данные о рынке (JSON):
+            # Если есть изображение
+            if image_base64:
+                image_prompt = """ТВОИ ПРАВИЛА РАБОТЫ С ИЗОБРАЖЕНИЯМИ:
+
+Если пользователь прикрепил изображение:
+
+1. Определи, что на нём
+2. Опиши видимую информацию
+3. Выдели ключевые элементы
+4. Сделай короткий вывод
+
+Не придумывай того, чего не видно.
+Если изображение нечеткое — запроси лучшее.
+
+Если на изображении график:
+- опиши тренд (вверх/вниз/флэт)
+- уровни поддержки/сопротивления
+- волатильность
+- объемы (если видно)
+- вероятное направление движения (без процентов и рекомендаций)
+
+НЕ использовать:
+- реальные названия активов, если их не видно
+- финансовые советы
+- прогнозы прибыли
+
+Если изображения нет — работай как обычный текстовый ассистент."""
+                
+                user_content = []
+                
+                # Формируем текстовую часть (всегда добавляем, даже если нет текста от пользователя)
+                text_prompt = f"""{image_prompt}
+
+Проанализируй прикрепленное изображение согласно правилам выше."""
+                
+                if user_message.strip():
+                    text_prompt = f"""Актуальные данные о рынке (JSON):
+
+{market_context}
+
+Вопрос пользователя: "{user_message}"
+
+{image_prompt}
+
+Проанализируй прикрепленное изображение согласно правилам выше."""
+                
+                user_content.append({
+                    "type": "text",
+                    "text": text_prompt
+                })
+                
+                user_content.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{image_mime_type};base64,{image_base64}"
+                    }
+                })
+                
+                messages.append({
+                    "role": "user",
+                    "content": user_content
+                })
+                
+                if self.provider == "openai":
+                    stream = self.client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=messages,
+                        temperature=0.7,
+                        max_tokens=1500,
+                        stream=True
+                    )
+                    
+                    for chunk in stream:
+                        if chunk.choices[0].delta.content:
+                            yield chunk.choices[0].delta.content
+                elif self.provider == "groq":
+                    yield "Извините, обработка изображений пока доступна только с OpenAI."
+            else:
+                # Обычный текстовый запрос
+                context_message = f"""Актуальные данные о рынке (JSON):
 
 {market_context}
 
 Вопрос пользователя: "{user_message}"
 
 Используй только данные из JSON. Дай аналитический, конкретный ответ, включая актуальные цены всех запрашиваемых монет и динамику их изменения. Не используй шаблонные блоки, формируй ответ под суть вопроса."""
-            
-            messages.append({"role": "user", "content": context_message})
-            
-            if self.provider == "openai":
-                stream = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    temperature=0.7,
-                    max_tokens=1500,
-                    stream=True
-                )
                 
-                for chunk in stream:
-                    if chunk.choices[0].delta.content:
-                        yield chunk.choices[0].delta.content
-            
-            elif self.provider == "groq":
-                stream = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    temperature=0.7,
-                    max_tokens=1500,
-                    stream=True
-                )
+                messages.append({"role": "user", "content": context_message})
                 
-                for chunk in stream:
-                    if chunk.choices[0].delta.content:
-                        yield chunk.choices[0].delta.content
+                if self.provider == "openai":
+                    stream = self.client.chat.completions.create(
+                        model=self.model,
+                        messages=messages,
+                        temperature=0.7,
+                        max_tokens=1500,
+                        stream=True
+                    )
+                    
+                    for chunk in stream:
+                        if chunk.choices[0].delta.content:
+                            yield chunk.choices[0].delta.content
+                
+                elif self.provider == "groq":
+                    stream = self.client.chat.completions.create(
+                        model=self.model,
+                        messages=messages,
+                        temperature=0.7,
+                        max_tokens=1500,
+                        stream=True
+                    )
+                    
+                    for chunk in stream:
+                        if chunk.choices[0].delta.content:
+                            yield chunk.choices[0].delta.content
                         
         except Exception as e:
             print(f"Error in streaming response: {e}")

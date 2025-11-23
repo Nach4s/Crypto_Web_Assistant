@@ -28,7 +28,20 @@ export default function Message({ message }) {
             : 'bg-gray-800 text-gray-100'
         }`}>
           {isUser ? (
-            <p className="whitespace-pre-wrap break-words">{message.content}</p>
+            <div>
+              {message.image && (
+                <div className="mb-2">
+                  <img 
+                    src={message.image} 
+                    alt="User attachment" 
+                    className="max-w-full max-h-64 rounded-lg"
+                  />
+                </div>
+              )}
+              {message.content && (
+                <p className="whitespace-pre-wrap break-words">{message.content}</p>
+              )}
+            </div>
           ) : (
             <div className="markdown-content">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
