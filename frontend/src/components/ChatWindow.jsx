@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Send, Loader2, Image as ImageIcon, X } from 'lucide-react'
 import Message from './Message'
 import TypingIndicator from './TypingIndicator'
+import { getApiUrl } from '../config'
 
 export default function ChatWindow({ sessionId }) {
   const [messages, setMessages] = useState([
@@ -125,7 +126,7 @@ export default function ChatWindow({ sessionId }) {
     setIsLoading(true)
 
     try {
-      const response = await fetch('/api/chat', {
+      const response = await fetch(getApiUrl('/api/chat'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

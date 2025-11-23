@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: crypto-assistant-backend
+    env: python
+    region: frankfurt
+    plan: free
+    buildCommand: |
+      cd backend
+      pip install -r requirements.txt
+    startCommand: |
+      cd backend
+      uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: "*"
+        sync: false
+    healthCheckPath: /docs
+
+  - type: static
+    name: crypto-assistant-frontend
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: frontend/dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://crypto-assistant-backend.onrender.com

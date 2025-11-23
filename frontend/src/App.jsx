@@ -3,6 +3,7 @@ import ChatWindow from './components/ChatWindow'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 import { Menu, X } from 'lucide-react'
+import { getApiUrl } from './config'
 
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -19,7 +20,7 @@ function App() {
 
   const fetchMarketData = async () => {
     try {
-      const response = await fetch('/api/market/data', {
+      const response = await fetch(getApiUrl('/api/market/data'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

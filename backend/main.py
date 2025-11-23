@@ -24,7 +24,7 @@ app = FastAPI(title="Crypto & Stock Chat Assistant API")
 # CORS middleware для работы с фронтендом
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # В продакшене указать конкретный домен
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
