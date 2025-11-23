@@ -2,7 +2,6 @@ services:
   - type: web
     name: crypto-assistant-backend
     env: python
-    pythonVersion: 3.11
     region: frankfurt
     plan: free
     rootDirectory: backend
@@ -17,13 +16,3 @@ services:
         value: "*"
         sync: false
     healthCheckPath: /docs
-
-  - type: static
-    name: crypto-assistant-frontend
-    rootDirectory: frontend
-    buildCommand: npm install && npm run build
-    staticPublishPath: dist
-    envVars:
-      - key: VITE_API_URL
-        value: https://crypto-assistant-backend.onrender.com
-
